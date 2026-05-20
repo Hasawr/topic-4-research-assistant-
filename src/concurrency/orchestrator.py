@@ -1,1 +1,75 @@
+import asyncio
+import httpx
+import logging
+from typing import List, Any
+from ai.sources import fetch_wikipedia, fetch_arxiv, fetch_web
+from ai.schemas import Source
 
+logger = logging.getLogger(__name__)
+
+class AsyncOrchestrator:
+    def __init__(self, max_concurrent_tasks: int = 3, per_source_timeout: float = 10.0):
+        self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
+        self.timeout = per_source_timeout
+
+    async def _fetch_with_safety(self, fetch_coro) -> List[Source]:
+        """Hər bir mənbəni semaphore və xüsusi timeout ilə qoruyaraq çağırır"""
+        async with self.semaphore:
+            try:
+                #"Use asyncio.timeout() / wait_for per task"
+                return await asyncio.wait_for(fetch_coro, timeout=self.timeout)
+            except asyncio.TimeoutError:
+                logger.warning(f"Mənbə sorğusu {self.timeout} saniyə ərzində cavab vermədi (Timeout).")
+                return []
+            except Exception as e:
+                logger.error(f"Mənbə çəkilərkən xəta baş verdi: {e}")
+                return []
+
+    async def gather_all_sources(self, query: str) -> List[Source]:
+        """Wikipedia, arXiv və Web mənbələrini eyni anda paralel çəkir"""
+        if not query.strip():
+            return []
+
+        headers = {
+            "User-Agent": "RufatResearchBot/1.0 (rufat.student@example.com)"
+        }
+        
+        async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
+            
+            tasks = [
+                self._fetch_with_safety(fetch_wikipedia(query, client=client)),
+                self._fetch_with_safety(fetch_arxiv(query, client=client)),
+                self._fetch_with_safety(fetch_web(query, client=client))
+            ]
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            all_sources = []
+            for res in results:
+                if isinstance(res, list): 
+                    all_sources.extend(res)
+            
+            return all_sources
+        
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    import time
+    
+    load_dotenv() 
+    
+    async def run_test():
+        print("Mühərrik işə düşdü...")
+        start_t = time.perf_counter()
+        
+        orchestrator = AsyncOrchestrator(max_concurrent_tasks=3, per_source_timeout=10.0)
+        
+        sources = await orchestrator.gather_all_sources("quantum computing")
+        
+        end_t = time.perf_counter()
+        print(f"Əməliyyat {end_t - start_t:.2f} saniyə çəkdi.")
+        print(f"Toplam tapılan mənbə: {len(sources)}")
+        for s in sources:
+            print(f"- [{s.origin}] {s.title} {s.url}")
+
+    asyncio.run(run_test())
