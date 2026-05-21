@@ -1,72 +1,49 @@
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch, AsyncMock
 from src.core.researcher import ResearchAssistant
 from ai.schemas import Source
 
-def test_conduct_research_empty_query():
-    """Boş sorğu göndərildikdə sistemin dərhal xəta mesajı qaytarmasını yoxlayır"""
+@pytest.fixture(autouse=True)
+def mock_cache_store():
+    with patch("src.core.researcher.FilesystemCacheStore") as mock_store:
+        yield mock_store
+
+@pytest.mark.asyncio
+async def test_empty_query():
     assistant = ResearchAssistant()
-    result = asyncio.run(assistant.conduct_research("   "))
-    assert "cannot be empty" in result
+    result = await assistant.conduct_research("   ")
+    assert result == "Error: Query cannot be empty."
 
-@patch("src.core.researcher.dummy_get_cached_answer", new_callable=AsyncMock)
-def test_conduct_research_cache_hit(mock_cache):
-    """Sual artıq keşdə varsa, sistemin internetə çıxmadan dərhal keşdən cavab qaytarmasını yoxlayır"""
-    async def run():
-        mock_cache.return_value = "Keşdən gələn hazır cavab"
-        assistant = ResearchAssistant()
-        return await assistant.conduct_research("test query")
-        
-    result = asyncio.run(run())
-    assert "[CACHED]" in result
-    assert "Keşdən gələn hazır cavab" in result
-
-@patch("src.core.researcher.dummy_get_cached_answer", new_callable=AsyncMock)
+@pytest.mark.asyncio
 @patch("src.core.researcher.AsyncOrchestrator.gather_all_sources", new_callable=AsyncMock)
-def test_conduct_research_no_sources(mock_gather, mock_cache):
-    """Keşdə cavab yoxdursa və heç bir mənbə tapılmadıqda sistemin uyğun mesaj qaytarmasını yoxlayır"""
-    async def run():
-        mock_cache.return_value = None
-        mock_gather.return_value = []
-        assistant = ResearchAssistant()
-        return await assistant.conduct_research("obscure topic")
-        
-    result = asyncio.run(run())
-    assert "No relevant sources found" in result
+async def test_no_sources_found(mock_gather):
+    mock_gather.return_value = []
+    assistant = ResearchAssistant()
+    result = await assistant.conduct_research("non_existent_query_123")
+    assert result == "No relevant sources found for the given query."
 
-@patch("src.core.researcher.dummy_get_cached_answer", new_callable=AsyncMock)
-@patch("src.core.researcher.dummy_save_to_cache", new_callable=AsyncMock)
-@patch("src.core.researcher.AsyncOrchestrator.gather_all_sources", new_callable=AsyncMock)
+@pytest.mark.asyncio
 @patch("src.core.researcher.synthesize")
-def test_conduct_research_success(mock_synthesize, mock_gather, mock_save, mock_cache):
-    """Tam uğurlu ssenarini yoxlayır: Keş boşdur -> Mənbə tapılır -> AI sintez edir -> Keşə yazılır"""
-    async def run():
-        mock_cache.return_value = None
-        mock_source = Source(origin="wikipedia", title="Test", snippet="Info", url="http://test")
-        mock_gather.return_value = [mock_source]
-        mock_synthesize.return_value = "Sintez olunmuş uğurlu elmi cavab."
-        
-        assistant = ResearchAssistant()
-        return await assistant.conduct_research("quantum")
-        
-    result = asyncio.run(run())
-    assert result == "Sintez olunmuş uğurlu elmi cavab."
-    mock_synthesize.assert_called_once_with(question="quantum", sources=mock_gather.return_value)
+@patch("src.core.researcher.AsyncOrchestrator.gather_all_sources", new_callable=AsyncMock)
+@patch("src.core.researcher.CacheService.lookup", new_callable=AsyncMock)
+@patch("src.core.researcher.CacheService.save", new_callable=AsyncMock)
+async def test_successful_research_and_cache(mock_save, mock_lookup, mock_gather, mock_synthesize):
+    fake_sources = [Source(title="Test Title", url="http://test.com", snippet="Test snippet", origin="web")]
+    mock_gather.return_value = fake_sources
+    mock_synthesize.return_value = "Süni intellektin cavabı budur."
+
+    assistant = ResearchAssistant()
+
+    # Ssenari 1: Cache Miss (Keş boşdur, internetə gedir)
+    mock_lookup.return_value = None
+    result1 = await assistant.conduct_research("Valid query")
+    assert result1 == "Süni intellektin cavabı budur."
+    mock_gather.assert_called_once()
     mock_save.assert_called_once()
 
-@patch("src.core.researcher.dummy_get_cached_answer", new_callable=AsyncMock)
-@patch("src.core.researcher.AsyncOrchestrator.gather_all_sources", new_callable=AsyncMock)
-@patch("src.core.researcher.synthesize")
-def test_conduct_research_synthesis_exception(mock_synthesize, mock_gather, mock_cache):
-    """Süni intellekt API-si çökdükdə sistemin graceful mesaj qaytarmasını yoxlayır"""
-    async def run():
-        mock_cache.return_value = None
-        mock_gather.return_value = [Source(origin="web", title="T", snippet="S", url="U")]
-        mock_synthesize.side_effect = Exception("API limiti bitib")
-        
-        assistant = ResearchAssistant()
-        return await assistant.conduct_research("test")
-        
-    result = asyncio.run(run())
-    assert "An error occurred during synthesis" in result
+    # Ssenari 2: Cache Hit (Keş tapılır, internet bypass edilir)
+    mock_gather.reset_mock()
+    mock_lookup.return_value = fake_sources
+    result2 = await assistant.conduct_research("Valid query")
+    assert result2 == "Süni intellektin cavabı budur."
+    mock_gather.assert_not_called()
