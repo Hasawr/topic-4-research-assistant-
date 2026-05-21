@@ -5,86 +5,89 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any
 from src.models import CachedResult
 
-# Defining the logger for this module
+# Module-level logger initialization
 logger = logging.getLogger(__name__)
 
 class BaseCacheStore(ABC):
     @abstractmethod
     async def get(self, source: str, key: str) -> CachedResult | None:
-        """Retrieve a record matching a source namespace and specific key."""
+        """Fetch a cached item using its source namespace and unique key."""
         pass
 
     @abstractmethod
     async def set(self, source: str, key: str, value: CachedResult) -> None:
-        """Commit a structured record cache sequence."""
+        """Persist a CachedResult to the underlying storage backend."""
         pass
 
     @abstractmethod
     async def clear(self) -> None:
-        """Purge all records in the engine."""
+        """Remove all cached entries from the store entirely."""
         pass
 
 
 class MemoryCacheStore(BaseCacheStore):
     def __init__(self) -> None:
-        self._store: Dict[str, Dict[str, str]] = {}
+        self._memory_map: Dict[str, Dict[str, str]] = {}
 
     async def get(self, source: str, key: str) -> CachedResult | None:
-        if source not in self._store or key not in self._store[source]:
+        if source not in self._memory_map or key not in self._memory_map[source]:
             return None
-        raw_json = self._store[source][key]
-        return CachedResult.model_validate_json(raw_json)
+        
+        serialized_data = self._memory_map[source][key]
+        return CachedResult.model_validate_json(serialized_data)
 
     async def set(self, source: str, key: str, value: CachedResult) -> None:
-        if source not in self._store:
-            self._store[source] = {}
-        self._store[source][key] = value.model_dump_json()
+        if source not in self._memory_map:
+            self._memory_map[source] = {}
+            
+        self._memory_map[source][key] = value.model_dump_json()
 
     async def clear(self) -> None:
-        self._store.clear()
+        self._memory_map.clear()
 
 
 class FilesystemCacheStore(BaseCacheStore):
     def __init__(self, base_dir: str) -> None:
-        self.base_dir = base_dir
-        os.makedirs(self.base_dir, exist_ok=True)
+        self.storage_directory = base_dir
+        os.makedirs(self.storage_directory, exist_ok=True)
 
-    def _get_path(self, source: str) -> str:
-        return os.path.join(self.base_dir, f"cache_{source}.json")
+    def _build_file_path(self, source: str) -> str:
+        return os.path.join(self.storage_directory, f"cache_{source}.json")
 
-    def _load_file(self, source: str) -> Dict[str, Any]:
-        path = self._get_path(source)
-        if not os.path.exists(path):
+    def _read_cache_file(self, source: str) -> Dict[str, Any]:
+        file_path = self._build_file_path(source)
+        if not os.path.exists(file_path):
             return {}
+            
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.error(f"Failed to read or decode cache file {path}: {e}")
+            with open(file_path, "r", encoding="utf-8") as file_handle:
+                return json.load(file_handle)
+        except (json.JSONDecodeError, OSError) as err:
+            logger.error(f"Unable to read or parse cache at {file_path}: {err}")
             return {}
 
-    def _write_file(self, source: str, data: Dict[str, Any]) -> None:
-        path = self._get_path(source)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    def _write_cache_file(self, source: str, cache_content: Dict[str, Any]) -> None:
+        file_path = self._build_file_path(source)
+        with open(file_path, "w", encoding="utf-8") as file_handle:
+            json.dump(cache_content, file_handle, indent=2, ensure_ascii=False)
 
     async def get(self, source: str, key: str) -> CachedResult | None:
-        data = self._load_file(source)
-        if key not in data:
+        cache_content = self._read_cache_file(source)
+        if key not in cache_content:
             return None
-        return CachedResult.model_validate(data[key])
+            
+        return CachedResult.model_validate(cache_content[key])
 
     async def set(self, source: str, key: str, value: CachedResult) -> None:
-        data = self._load_file(source)
-        data[key] = json.loads(value.model_dump_json())
-        self._write_file(source, data)
+        cache_content = self._read_cache_file(source)
+        cache_content[key] = json.loads(value.model_dump_json())
+        self._write_cache_file(source, cache_content)
 
     async def clear(self) -> None:
-        if os.path.exists(self.base_dir):
-            for file in os.listdir(self.base_dir):
-                if file.endswith(".json"):
+        if os.path.exists(self.storage_directory):
+            for filename in os.listdir(self.storage_directory):
+                if filename.endswith(".json"):
                     try:
-                        os.remove(os.path.join(self.base_dir, file))
-                    except OSError as e:
-                        logger.error(f"Failed to delete cache file {file}: {e}")
-
+                        os.remove(os.path.join(self.storage_directory, filename))
+                    except OSError as err:
+                        logger.error(f"Could not delete cache file {filename}: {err}")
