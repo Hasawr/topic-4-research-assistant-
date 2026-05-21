@@ -4,6 +4,7 @@ import logging
 from typing import List, Any
 from ai.sources import fetch_wikipedia, fetch_arxiv, fetch_web
 from ai.schemas import Source
+from dataclasses import replace
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,9 @@ class AsyncOrchestrator:
                 logger.error(f"Mənbə çəkilərkən xəta baş verdi: {e}")
                 return []
 
-    async def gather_all_sources(self, query: str) -> List[Source]:
+    async def gather_all_sources(self, query: str, arxiv_query: str = None) -> List[Source]:
         """Wikipedia, arXiv və Web mənbələrini eyni anda paralel çəkir"""
+        arxiv_search_term = arxiv_query if arxiv_query else query
         if not query.strip():
             return []
 
@@ -38,17 +40,34 @@ class AsyncOrchestrator:
             
             tasks = [
                 self._fetch_with_safety(fetch_wikipedia(query, client=client)),
-                self._fetch_with_safety(fetch_arxiv(query, client=client)),
+                self._fetch_with_safety(fetch_arxiv(arxiv_search_term, client=client)),
                 self._fetch_with_safety(fetch_web(query, client=client))
             ]
             
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # results = await asyncio.gather(*tasks, return_exceptions=True)
             
+            # all_sources = []
+            # for res in results:
+            #     if isinstance(res, list): 
+            #         all_sources.extend(res)
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+                
             all_sources = []
             for res in results:
-                if isinstance(res, list): 
-                    all_sources.extend(res)
-            
+                if isinstance(res, list):
+                    for item in res:
+                        if "wikipedia.org" in item.url.lower():
+                            new_item = Source(
+                                title=item.title,
+                                url=item.url,
+                                snippet=item.snippet,
+                                origin="wikipedia"
+                            )
+                            all_sources.append(new_item)
+                        else:
+                            all_sources.append(item)
+                
             return all_sources
         
 
@@ -64,7 +83,7 @@ if __name__ == "__main__":
         
         orchestrator = AsyncOrchestrator(max_concurrent_tasks=3, per_source_timeout=10.0)
         
-        sources = await orchestrator.gather_all_sources("quantum computing")
+        sources = await orchestrator.gather_all_sources("What is photosynthesis and what are its main stages?")
         
         end_t = time.perf_counter()
         print(f"Əməliyyat {end_t - start_t:.2f} saniyə çəkdi.")

@@ -6,7 +6,7 @@ from ai.schemas import Source
 
 from src.config import settings
 from src.services.cache import CacheService
-
+from src.services.ai_services import extract_arxiv_keywords
 
 from src.storage.cache_store import FilesystemCacheStore 
 
@@ -28,8 +28,15 @@ class ResearchAssistant:
             print("[INFO] Keş tapıldı (Cache Hit)! İnternet axtarışı bypass edilir...")
             sources = cached_sources
         else:
-            print("[INFO] Keş tapılmadı və ya köhnəlib (Cache Miss). İnternetdən təzə məlumatlar çəkilir...")
-            sources = await self.orchestrator.gather_all_sources(cleaned_query)
+            print("[INFO] Keş tapılmadı. Axtarış üçün parametrlər hazırlanır...")
+            
+            arxiv_safe_query = extract_arxiv_keywords(cleaned_query)
+            print(f"[DEBUG] ArXiv üçün açar sözlər: {arxiv_safe_query}")
+            
+            sources = await self.orchestrator.gather_all_sources(
+                cleaned_query, 
+                arxiv_query=arxiv_safe_query 
+            )
             
             if not sources:
                 return "No relevant sources found for the given query."
@@ -51,7 +58,7 @@ if __name__ == "__main__":
         print("Mühərrik işə düşür...")
         assistant = ResearchAssistant()
         
-        test_query = "How does CRISPR-Cas9 gene editing work at a molecular level?"
+        test_query = "What were the main causes of the 2008 financial crisis?"
         print(f"Araşdırılır: '{test_query}'\n" + "-"*40)
         
         result1 = await assistant.conduct_research(test_query)
