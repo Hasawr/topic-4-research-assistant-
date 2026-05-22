@@ -8,7 +8,7 @@ from ai.schemas import Source, AnswerWithCitations
 from src.config import settings
 from src.services.cache import CacheService
 from src.services.ai_services import extract_keywords
-from src.storage.cache_store import FilesystemCacheStore 
+from src.storage.cache_store import FilesystemCacheStore
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class ResearchAssistant:
             logger.info("Keş tapıldı (Cache Hit)! İnternet axtarışı bypass edilir...")
             sources = cached_sources
         else:
-            logger.info("Keş tapılmadı (Cache Miss). Axtarış üçün parametrlər hazırlanır...")
+            logger.info("Keş tapılmadı (Cache Miss) . Axtarış üçün parametrlər hazırlanır...")
 
             safe_query = extract_keywords(cleaned_query)
             
