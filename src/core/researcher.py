@@ -15,36 +15,61 @@ logger = logging.getLogger(__name__)
 class ResearchAssistant:
     def __init__(self):
         self.orchestrator = AsyncOrchestrator(max_concurrent_tasks=3, per_source_timeout=10.0)
-        self.store = FilesystemCacheStore(base_dir=settings.cache_dir)  
+        self.store = FilesystemCacheStore(base_dir=settings.cache_dir)
         self.cache_service = CacheService(store=self.store, ttl_seconds=settings.cache_ttl_seconds)
 
-    async def conduct_research(self, query: str) -> AnswerWithCitations | str:
+    async def conduct_research(
+        self,
+        query: str,
+        no_cache: bool = False,
+        sources: Optional[List[str]] = None
+    ) -> AnswerWithCitations | str:
         cleaned_query = query.strip()
+
         if not cleaned_query:
             return "Error: Query cannot be empty."
 
-        cache_key = cleaned_query.lower()
+        enabled_sources = tuple(sources) if sources else ("wiki", "arxiv", "web")
 
-        cached_sources: Optional[List[Source]] = await self.cache_service.lookup(source="orchestrator_cache", query=cache_key)
-        
+        cache_key = f"{cleaned_query.lower()}|sources={','.join(enabled_sources)}"
+
+        cached_sources: Optional[List[Source]] = None
+
+        if not no_cache:
+            cached_sources = await self.cache_service.lookup(
+                source="orchestrator_cache",
+                query=cache_key
+            )
+        else:
+            logger.info("--no-cache aktivdir. Cache yoxlanışı keçilir.")
+
         if cached_sources:
             logger.info("Keş tapıldı (Cache Hit)! İnternet axtarışı bypass edilir...")
-            sources = cached_sources
+            gathered_sources = cached_sources
         else:
-            logger.info("Keş tapılmadı (Cache Miss) . Axtarış üçün parametrlər hazırlanır...")
+            logger.info("Keş tapılmadı (Cache Miss). Axtarış üçün parametrlər hazırlanır...")
 
             safe_query = extract_keywords(cleaned_query)
-            
-            sources = await self.orchestrator.gather_all_sources(safe_query,enabled=("wiki", "arxiv", "web"))
-            
-            if not sources:
+
+            gathered_sources = await self.orchestrator.gather_all_sources(
+                safe_query,
+                enabled=enabled_sources
+            )
+
+            if not gathered_sources:
                 return "No relevant sources found for the given query."
 
-            await self.cache_service.save(source="orchestrator_cache", query=cache_key, data=sources)
+            if not no_cache:
+                await self.cache_service.save(
+                    source="orchestrator_cache",
+                    query=cache_key,
+                    data=gathered_sources
+                )
 
         try:
-            answer = synthesize(question=cleaned_query, sources=sources)
+            answer = synthesize(question=cleaned_query, sources=gathered_sources)
             return answer
+
         except Exception as e:
             logger.error(f"Sintez zamanı xəta: {e}")
             return f"An error occurred during synthesis: {str(e)}"

@@ -13,6 +13,7 @@ except ImportError:
     pass
 from src.core.researcher import ResearchAssistant
 
+ALLOWED_SOURCES = {"wiki", "wikipedia", "arxiv", "web", "tavily"}
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -35,27 +36,58 @@ def validate_question(question: str) -> str:
 
     return cleaned
 
+def validate_sources(sources: str | None) -> list[str] | None:
+    """Validate comma-separated source names."""
+    if not sources:
+        return None
 
+    cleaned_sources = [
+        source.strip().lower()
+        for source in sources.split(",")
+        if source.strip()
+    ]
+
+    invalid_sources = [
+        source for source in cleaned_sources
+        if source not in ALLOWED_SOURCES
+    ]
+
+    if invalid_sources:
+        logger.error(
+            f"Validation Error: Unsupported source(s): {', '.join(invalid_sources)}. "
+            f"Allowed sources are: {', '.join(sorted(ALLOWED_SOURCES))}"
+        )
+        sys.exit(1)
+
+    return cleaned_sources
 
 def handle_ask(args):
     """Handles the execution of the 'ask' command by running the async engine."""
     question = validate_question(args.question)
+    sources = validate_sources(args.sources)
 
     logger.info(f"Processing question: '{question}'")
+
     if args.no_cache:
         logger.info("Cache bypass flag (--no-cache) detected.")
-    if args.sources:
-        logger.info(f"Source filtering requested for: {args.sources}")
+
+    if sources:
+        logger.info(f"Source filtering requested for: {', '.join(sources)}")
 
     logger.info("Initializing Research Assistant engine...")
     assistant = ResearchAssistant()
 
     logger.info("Handing off control to the Async Orchestration layer...")
-    try:
-        # Run the async core research task
-        result = asyncio.run(assistant.conduct_research(question))
 
-        # --- PRETTY PRINTING LOGIC ---
+    try:
+        result = asyncio.run(
+            assistant.conduct_research(
+                query=question,
+                no_cache=args.no_cache,
+                sources=sources
+            )
+        )
+
         print("\n" + "=" * 60)
         print("                 AI RESEARCH ASSISTANT REPORT                  ")
         print("=" * 60)
@@ -64,7 +96,6 @@ def handle_ask(args):
         print("SUMMARY ANSWER:")
         print("-" * 60)
 
-        # If the result is a string but structured like an object, or a real object:
         if hasattr(result, 'answer'):
             print(result.answer)
             display_citations(getattr(result, 'citations', []))
@@ -72,7 +103,6 @@ def handle_ask(args):
             print(result['answer'])
             display_citations(result.get('citations', []))
         else:
-            # If it's just a raw text fallback
             print(result)
 
         print("=" * 60 + "\n")

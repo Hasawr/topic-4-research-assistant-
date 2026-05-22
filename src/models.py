@@ -5,16 +5,25 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from ai.schemas import Source, AnswerWithCitations
 
+from datetime import datetime, timezone
+from typing import Any
+
+from pydantic import BaseModel
+
+
 class CachedResult(BaseModel):
-    """Stores a cached search result to minimize redundant API calls."""
-    source_type: str = Field(..., description="The platform label: wiki, arxiv, or web")
-    canonical_query: str = Field(..., description="Lowercase, stripped search term")
-    data: list[Source] = Field(..., description="List of source objects provided by AI layer")
+    source_type: str
+    canonical_query: str
+    data: list[Source]
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def is_expired(self, ttl_seconds: int) -> bool:
-        """Check if the cache entry has exceeded its time-to-live."""
-        elapsed_seconds = (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+        timestamp = self.timestamp
+
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+        elapsed_seconds = (datetime.now(timezone.utc) - timestamp).total_seconds()
         return elapsed_seconds > ttl_seconds
 
 class ResearchSession(BaseModel):
