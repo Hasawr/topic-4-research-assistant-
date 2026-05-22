@@ -43,13 +43,6 @@ class AsyncOrchestrator:
                 self._fetch_with_safety(fetch_web(query, client=client))
             ]
             
-            # results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # all_sources = []
-            # for res in results:
-            #     if isinstance(res, list): 
-            #         all_sources.extend(res)
-            
             results = await asyncio.gather(*tasks, return_exceptions=True)
                 
             all_sources = []
