@@ -33,7 +33,7 @@ def extract_keywords(query: str) -> str:
     # 1. LLM üçün sərt və dəqiq təlimat (Prompt)
     prompt = f"""
     Sən axtarış sistemləri üçün açar sözlər çıxaran bir agentsən.
-    İstifadəçinin verdiyi aşağıdakı sualdan Wikipedia və arXiv-də axtarış etmək üçün ən vacib 1-3 açar sözü çıxar.
+    İstifadəçinin verdiyi aşağıdakı sualdan Wikipedia və ArXiv-də axtarış etmək üçün ən vacib 1-3 açar sözü çıxar.
     QAYDALAR:
     - Heç bir əlavə söz yazma (məsələn, "Açar sözlər bunlardır:" kimi cümlələr qurma).
     - Durğu işarələri (nöqtə, vergül) istifadə etmə.
