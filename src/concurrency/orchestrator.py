@@ -26,9 +26,8 @@ class AsyncOrchestrator:
                 logger.error(f"Mənbə çəkilərkən xəta baş verdi: {e}")
                 return []
 
-    async def gather_all_sources(self, query: str, arxiv_query: str = None) -> List[Source]:
+    async def gather_all_sources(self, query: str) -> List[Source]:
         """Wikipedia, arXiv və Web mənbələrini eyni anda paralel çəkir"""
-        arxiv_search_term = arxiv_query if arxiv_query else query
         if not query.strip():
             return []
 
@@ -40,7 +39,7 @@ class AsyncOrchestrator:
             
             tasks = [
                 self._fetch_with_safety(fetch_wikipedia(query, client=client)),
-                self._fetch_with_safety(fetch_arxiv(arxiv_search_term, client=client)),
+                self._fetch_with_safety(fetch_arxiv(query, client=client)),
                 self._fetch_with_safety(fetch_web(query, client=client))
             ]
             
