@@ -1,14 +1,21 @@
+"""
+Cache storage implementations for the Async Research Assistant.
+Provides memory and filesystem backends.
+"""
 import json
 import os
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any
+
 from src.models import CachedResult
 
 # Module-level logger initialization
 logger = logging.getLogger(__name__)
 
 class BaseCacheStore(ABC):
+    """Abstract base class defining the contract for cache storage backends."""
+    
     @abstractmethod
     async def get(self, source: str, key: str) -> CachedResult | None:
         """Fetch a cached item using its source namespace and unique key."""
@@ -24,10 +31,11 @@ class BaseCacheStore(ABC):
         """Remove all cached entries from the store entirely."""
         pass
 
-
 class MemoryCacheStore(BaseCacheStore):
+    """In-memory cache implementation using standard Python dictionaries. Ideal for testing."""
+    
     def __init__(self) -> None:
-        self._memory_map: Dict[str, Dict[str, str]] = {}
+        self._memory_map: dict[str, dict[str, str]] = {}
 
     async def get(self, source: str, key: str) -> CachedResult | None:
         if source not in self._memory_map or key not in self._memory_map[source]:
@@ -37,16 +45,15 @@ class MemoryCacheStore(BaseCacheStore):
         return CachedResult.model_validate_json(serialized_data)
 
     async def set(self, source: str, key: str, value: CachedResult) -> None:
-        if source not in self._memory_map:
-            self._memory_map[source] = {}
-            
-        self._memory_map[source][key] = value.model_dump_json()
+        # Using setdefault is cleaner than an if/not in check
+        self._memory_map.setdefault(source, {})[key] = value.model_dump_json()
 
     async def clear(self) -> None:
         self._memory_map.clear()
 
-
 class FilesystemCacheStore(BaseCacheStore):
+    """Persistent cache implementation saving results to local JSON files."""
+    
     def __init__(self, base_dir: str) -> None:
         self.storage_directory = base_dir
         os.makedirs(self.storage_directory, exist_ok=True)
@@ -54,7 +61,7 @@ class FilesystemCacheStore(BaseCacheStore):
     def _build_file_path(self, source: str) -> str:
         return os.path.join(self.storage_directory, f"cache_{source}.json")
 
-    def _read_cache_file(self, source: str) -> Dict[str, Any]:
+    def _read_cache_file(self, source: str) -> dict[str, Any]:
         file_path = self._build_file_path(source)
         if not os.path.exists(file_path):
             return {}
@@ -66,7 +73,7 @@ class FilesystemCacheStore(BaseCacheStore):
             logger.error(f"Unable to read or parse cache at {file_path}: {err}")
             return {}
 
-    def _write_cache_file(self, source: str, cache_content: Dict[str, Any]) -> None:
+    def _write_cache_file(self, source: str, cache_content: dict[str, Any]) -> None:
         file_path = self._build_file_path(source)
         with open(file_path, "w", encoding="utf-8") as file_handle:
             json.dump(cache_content, file_handle, indent=2, ensure_ascii=False)
