@@ -1,9 +1,20 @@
+"""
+Configuration module for the Async Research Assistant.
+
+This module uses Pydantic BaseSettings to manage environment variables,
+validate API keys based on the selected LLM provider, and configure
+caching and observability parameters.
+"""
 import os
 from typing import Literal
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    """
+    Application settings managed via environment variables.
+    Loads from a .env file and validates required dependencies.
+    """
     # LLM Engine Configuration
     llm_provider: Literal["anthropic", "openai", "gemini"] = Field(default="gemini")
     llm_model: str = Field(default="gemini-2.5-flash")
@@ -28,7 +39,8 @@ class Settings(BaseSettings):
 
     @field_validator("anthropic_api_key")
     @classmethod
-    def validate_anthropic_key(cls, v: str | None, info) -> str | None:
+    def validate_anthropic_key(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Ensure the Anthropic API key is present if Anthropic is the selected provider."""
         if info.data.get("llm_provider") == "anthropic" and not v:
             if os.getenv("OFFLINE_MODE") != "true":
                 raise ValueError("Missing ANTHROPIC_API_KEY: Please add it to your .env file since you selected 'anthropic' as your provider.")
@@ -36,7 +48,8 @@ class Settings(BaseSettings):
 
     @field_validator("gemini_api_key")
     @classmethod
-    def validate_gemini_key(cls, v: str | None, info) -> str | None:
+    def validate_gemini_key(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Ensure the Gemini API key is present if Gemini is the selected provider."""
         if info.data.get("llm_provider") == "gemini" and not v:
             if os.getenv("OFFLINE_MODE") != "true":
                 raise ValueError("Missing GEMINI_API_KEY: Please add it to your .env file since you selected 'gemini' as your provider.")
@@ -44,7 +57,8 @@ class Settings(BaseSettings):
         
     @field_validator("openai_api_key")
     @classmethod
-    def validate_openai_key(cls, v: str | None, info) -> str | None:
+    def validate_openai_key(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """Ensure the OpenAI API key is present if OpenAI is the selected provider."""
         if info.data.get("llm_provider") == "openai" and not v:
             if os.getenv("OFFLINE_MODE") != "true":
                 raise ValueError("Missing OPENAI_API_KEY: Please add it to your .env file since you selected 'openai' as your provider.")
@@ -59,10 +73,11 @@ class Settings(BaseSettings):
 # Initialize settings
 settings = Settings()
 
-# Confirm what was loaded
-print("Settings Loaded Successfully!")
-print(f"LLM Provider : {settings.llm_provider.upper()} ({settings.llm_model})")
-print(f"Web Search   : {settings.web_search_provider.capitalize()}")
-print(f"Cache Engine : {settings.cache_backend.capitalize()}")
-print(f"Log Level    : {settings.log_level}")
-print("-" * 40)
+# Prevent prints from triggering every time this file is imported elsewhere
+if __name__ == "__main__":
+    print("Settings Loaded Successfully!")
+    print(f"LLM Provider : {settings.llm_provider.upper()} ({settings.llm_model})")
+    print(f"Web Search   : {settings.web_search_provider.capitalize()}")
+    print(f"Cache Engine : {settings.cache_backend.capitalize()}")
+    print(f"Log Level    : {settings.log_level}")
+    print("-" * 40)
