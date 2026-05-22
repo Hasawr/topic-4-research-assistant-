@@ -6,6 +6,7 @@ validate API keys based on the selected LLM provider, and configure
 caching and observability parameters.
 """
 import os
+import logging
 from typing import Literal
 from pydantic import Field, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -73,11 +74,17 @@ class Settings(BaseSettings):
 # Initialize settings
 settings = Settings()
 
-# Prevent prints from triggering every time this file is imported elsewhere
+# Configure logging using the level defined in settings
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# Prevent logs from triggering every time this file is imported elsewhere
 if __name__ == "__main__":
-    print("Settings Loaded Successfully!")
-    print(f"LLM Provider : {settings.llm_provider.upper()} ({settings.llm_model})")
-    print(f"Web Search   : {settings.web_search_provider.capitalize()}")
-    print(f"Cache Engine : {settings.cache_backend.capitalize()}")
-    print(f"Log Level    : {settings.log_level}")
-    print("-" * 40)
+    logger.info("Settings Loaded Successfully!")
+    logger.info(f"LLM Provider : {settings.llm_provider.upper()} ({settings.llm_model})")
+    logger.info(f"Web Search   : {settings.web_search_provider.capitalize()}")
+    logger.info(f"Cache Engine : {settings.cache_backend.capitalize()}")
+    logger.info(f"Log Level    : {settings.log_level}")
