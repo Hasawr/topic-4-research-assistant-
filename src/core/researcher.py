@@ -35,7 +35,7 @@ class ResearchAssistant:
 
             safe_query = extract_keywords(cleaned_query)
             
-            sources = await self.orchestrator.gather_all_sources(safe_query)
+            sources = await self.orchestrator.gather_all_sources(safe_query,enabled=("wiki", "arxiv", "web"))
             
             if not sources:
                 return "No relevant sources found for the given query."
