@@ -1,6 +1,7 @@
 name: CI
 on: [pull_request, push]
-
+env:
+  GEMINI_API_KEY: ${{secrets.GEMINI_API_KEY}}
 jobs:
   ci:
     runs-on: ubuntu-latest
