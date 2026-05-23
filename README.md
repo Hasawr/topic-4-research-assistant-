@@ -93,8 +93,8 @@ The `ai/` layer is a **read-only contract**: it provides the async fetchers, LLM
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd <repo-folder>
+git clone https://github.com/Hasawr/topic-4-research-assistant-.git
+cd topic-4-research-assistant-
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
