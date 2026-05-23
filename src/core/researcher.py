@@ -82,7 +82,7 @@ if __name__ == "__main__":
         print("Mühərrik işə düşür...")
         assistant = ResearchAssistant()
         
-        test_query = "What were the main causes of the 2008 financial crisis?"
+        test_query = "What is octane?"
         print(f"Araşdırılır: '{test_query}'\n" + "-"*40)
         
         result1 = await assistant.conduct_research(test_query)
