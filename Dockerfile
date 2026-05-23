@@ -24,5 +24,5 @@ ENV PYTHONUNBUFFERED=1
 RUN useradd -m appuser
 USER appuser
 
-CMD ["python", "demo_ai.py"]
+CMD ["python", "demo_ai.py","--offline"]
 
