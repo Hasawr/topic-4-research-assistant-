@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+
+# Virtual environments
+.venv
+venv
+env
+
+# Local cache and storage
+.cache
+.cache_storage
+*.json.cache
+
+# Environment files — NEVER bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Test and dev artifacts
+.pytest_cache
+.coverage
+htmlcov
+*.log
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports
+*.tex
+*.pdf
