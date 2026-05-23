@@ -5,6 +5,9 @@ from typing import List, Callable, Any
 from ai.sources import fetch_wikipedia, fetch_arxiv, fetch_web
 from ai.schemas import Source
 
+# Verilənlər bazası bağlantısı üçün PostgresStore-u import edirik
+from src.storage.db_store import PostgresStore
+
 logger = logging.getLogger(__name__)
 
 class AsyncOrchestrator:
@@ -56,7 +59,6 @@ class AsyncOrchestrator:
         async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
             tasks = []
             if "wiki" in enabled:
-                # _fetch_with_retry-ə funksiya + arqumentlər veririk
                 tasks.append(self._fetch_with_retry(fetch_wikipedia, query, client))
             if "arxiv" in enabled:
                 tasks.append(self._fetch_with_retry(fetch_arxiv, query, client))
@@ -82,14 +84,27 @@ if __name__ == "__main__":
         print("Mühərrik işə düşdü...")
         start_t = time.perf_counter()
         
+        query = "What is photosynthesis and what are its main stages?"
+        
         orchestrator = AsyncOrchestrator(max_concurrent_tasks=3, per_source_timeout=10.0)
         
-        sources = await orchestrator.gather_all_sources("What is photosynthesis and what are its main stages?")
+        sources = await orchestrator.gather_all_sources(query)
         
         end_t = time.perf_counter()
         print(f"Əməliyyat {end_t - start_t:.2f} saniyə çəkdi.")
         print(f"Toplam tapılan mənbə: {len(sources)}")
         for s in sources:
             print(f"- [{s.origin}] {s.title} {s.url}")
+
+        # Tədqiqat nəticələrinin PostgreSQL bazasına (my_table) yazılması
+        if sources:
+            print("\nNəticələr my_table cədvəlinə yazılır...")
+            db_store = PostgresStore()
+            await db_store.init_db()
+            
+            # Burada tapılan mənbələrin icmalı simulyasiya edilir.
+            # Əsas LLM provayderimiz olan Gemini-dən gələcək tam sintez bu formada bazaya ötürüləcək.
+            mock_result = f"{len(sources)} mənbə əsasında tədqiqat bazası toplandı. Mövzu: {query}"
+            await db_store.save_research_result(topic=query, result=mock_result)
 
     asyncio.run(run_test())
