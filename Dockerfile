@@ -17,7 +17,8 @@ COPY ai/ ./ai
 COPY data/ ./data
 COPY src/ ./src
 COPY demo_ai.py .
-
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 ENV PYTHONUNBUFFERED=1
 
 # Create and switch to a secure non-root user
