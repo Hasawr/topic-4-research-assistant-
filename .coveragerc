@@ -1,0 +1,6 @@
+[run]
+omit =
+    src/ui.py
+    src/cli.py
+    src/storage/cache_store.py
+    src/storage/db_store.py

@@ -35,14 +35,23 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
 
     # Web Search Configuration
-    web_search_provider: Literal["tavily", "serper", "duckduckgo"] = Field(default="duckduckgo")
+    web_search_provider: Literal["tavily", "serper", "duckduckgo"] = Field(default="tavily")
     tavily_api_key: str | None = None
     serper_api_key: str | None = None
 
     # Cache Control Parameters
-    cache_backend: Literal["memory", "filesystem"] = Field(default="memory")
-    cache_ttl_seconds: int = Field(default=86400, description="Default TTL is 24 hours")
-    cache_dir: str = Field(default="./.cache_storage")
+    cache_backend: Literal["memory", "filesystem", "postgresql"] = Field(default="postgresql")
+    cache_ttl_seconds: int = Field(default=14400, description="Default TTL is 4 hours")
+    cache_dir: str = Field(default="./.cache")
+
+    # PostgreSQL Cache Settings (only required when cache_backend="postgresql")
+    database_url: str | None = Field(
+        default=None,
+        description="PostgreSQL DSN, e.g. postgresql://user:pass@host:5432/research_db"
+    )
+    db_cache_table: str = Field(default="my_table")
+    db_pool_min: int = Field(default=1)
+    db_pool_max: int = Field(default=5)
 
     # Extra runtime settings
     per_source_timeout_seconds: int = Field(default=10)
@@ -82,6 +91,16 @@ class Settings(BaseSettings):
                     "Missing OPENAI_API_KEY: Please add it to your .env file "
                     "since you selected 'openai' as your provider."
                 )
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("cache_backend") == "postgresql" and not v:
+            raise ValueError(
+                "DATABASE_URL is required when CACHE_BACKEND=postgresql. "
+                "Set it in your .env file: DATABASE_URL=postgresql://user:pass@host:5432/research_db"
+            )
         return v
 
     model_config = SettingsConfigDict(

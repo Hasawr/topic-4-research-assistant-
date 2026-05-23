@@ -1,0 +1,33 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest pytest-cov pytest-asyncio pydantic pydantic-settings
+
+    - name: Run tests with pytest
+      run: |
+        export GEMINI_API_KEY=${{secrets.GEMINI_API_KEY}}
+        export CACHE_BACKEND="json"
+        export DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+        pytest tests/ --cov=src --cov-report=term-missing
