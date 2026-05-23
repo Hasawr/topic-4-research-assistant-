@@ -6,18 +6,10 @@ storage, and query normalization to prevent redundant API calls to search provid
 """
 
 import logging
-
 from ai.schemas import Source
 from src.config import settings
 from src.models import CachedResult
 from src.storage.cache_store import BaseCacheStore
-
-
-logger = logging.getLogger(__name__)
-
-
-class CacheService:
-    """Service layer responsible for cache lookup, saving, and query normalization."""
 
     def __init__(
         self,

@@ -26,6 +26,7 @@ class CachedResult(BaseModel):
         elapsed_seconds = (datetime.now(timezone.utc) - timestamp).total_seconds()
         return elapsed_seconds > ttl_seconds
 
+
 class ResearchSession(BaseModel):
     """Represents an active or completed research inquiry."""
     session_id: str = Field(..., description="Unique identifier for the research session")
